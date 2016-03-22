@@ -29,7 +29,6 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 
 import org.msgpack.hadoop.io.MessagePackWritable;
-import org.msgpack.hadoop.mapreduce.input.MessagePackRecordReader;
 
 public class MessagePackInputFormat extends FileInputFormat<LongWritable, MessagePackWritable> {
     @Override
@@ -39,7 +38,7 @@ public class MessagePackInputFormat extends FileInputFormat<LongWritable, Messag
 
     @Override
     public RecordReader<LongWritable, MessagePackWritable> createRecordReader(InputSplit split,
-        TaskAttemptContext taskAttempt)
+                                                                              TaskAttemptContext taskAttempt)
     throws IOException, InterruptedException {
         return new MessagePackRecordReader();
     }

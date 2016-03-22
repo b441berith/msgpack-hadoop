@@ -22,9 +22,9 @@
   </scm>
 
   <properties>
-    <msgpack.version>0.5.2-devel</msgpack.version>
-    <hadoop.version>0.20.2</hadoop.version>
-    <hive.version>0.8.0-SNAPSHOT</hive.version>
+    <msgpack-core.version>0.8.3</msgpack-core.version>
+    <hadoop.version>1.2.1</hadoop.version>
+    <hive.version>1.1.1</hive.version>
   </properties>
 
   <dependencies>
@@ -51,8 +51,8 @@
       </dependency>
     <dependency>
       <groupId>org.msgpack</groupId>
-      <artifactId>msgpack</artifactId>
-      <version>${msgpack.version}</version>
+      <artifactId>msgpack-core</artifactId>
+      <version>${msgpack-core.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -83,17 +83,17 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hive</groupId>
-      <artifactId>common</artifactId>
+      <artifactId>hive-common</artifactId>
       <version>${hive.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hive</groupId>
-      <artifactId>exec</artifactId>
+      <artifactId>hive-exec</artifactId>
       <version>${hive.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hive</groupId>
-      <artifactId>serde</artifactId>
+      <artifactId>hive-serde</artifactId>
       <version>${hive.version}</version>
     </dependency>
   </dependencies>

@@ -18,39 +18,67 @@
 
 package org.msgpack.hadoop.io;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.io.BytesWritable;
+import org.msgpack.core.MessagePack;
+import org.msgpack.core.MessagePacker;
+import org.msgpack.value.ImmutableValue;
+
+import java.io.ByteArrayOutputStream;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.WritableComparable;
-
-import org.msgpack.MessagePack;
-import org.msgpack.MessagePackObject;
-
 /**
  * A Hadoop Writable wrapper for MessagePack (untyped).
  */
-public class MessagePackWritable implements WritableComparable<MessagePackWritable> {
-    protected MessagePackObject obj_ = null;
+public class MessagePackWritable extends BytesWritable {
+    private static final Log LOG = LogFactory.getLog(MessagePackWritable.class.getName());
+
+    protected ImmutableValue obj_ = null;
+    protected byte[] bytes_;
+
+    private ByteArrayOutputStream outStream;
+    private MessagePacker packer;
 
     public MessagePackWritable() {}
 
-    public MessagePackWritable(MessagePackObject obj) {
+    public MessagePackWritable(ImmutableValue obj) {
         obj_ = obj;
+        initWritable(obj);
     }
 
-    public void set(MessagePackObject obj) { obj_ = obj; }
-
-    public MessagePackObject get() { return obj_; }
-
-    public byte[] getRawBytes() {
-        return MessagePack.pack(obj_);
+    private void initWritable(ImmutableValue obj) {
+        if (outStream == null) {
+            outStream = new ByteArrayOutputStream();
+        }
+        if (packer == null) {
+            packer = MessagePack.newDefaultPacker(outStream);
+        }
+        outStream.reset();
+        try {
+            packer.packValue(obj);
+        } catch (IOException e) {
+            LOG.error(e);
+        }
+        bytes_ = outStream.toByteArray();
+        set(bytes_, 0, bytes_.length);
     }
-    
+
+    public void set(ImmutableValue obj) {
+        obj_ = obj;
+        initWritable(obj);
+    }
+
+    @Override
+    public byte[] getBytes() {
+        return bytes_;
+    }
+
     public void write(DataOutput out) throws IOException {
         assert(obj_ != null);
-        byte[] raw = MessagePack.pack(obj_);
+        byte[] raw = getBytes();
         if (raw == null) return;
         out.writeInt(raw.length);
         out.write(raw, 0, raw.length);
@@ -62,20 +90,8 @@ public class MessagePackWritable implements WritableComparable<MessagePackWritab
         if (size > 0) {
             byte[] raw = new byte[size];
             in.readFully(raw, 0, size);
-            // TODO: 2011/05/07 Kazuki Ohta <kazuki.ohta@gmail.com>
-            // Want to avoid extra allocation here, but MessagePackObject is
-            // abstract.
-            obj_ = MessagePack.unpack(raw);
+            obj_ = MessagePack.newDefaultUnpacker(raw).unpackValue();
             assert(obj_ != null);
         }
-    }
-
-    @Override
-    public int compareTo(MessagePackWritable other) {
-        // TODO: 2010/11/09 Kazuki Ohta <kazuki.ohta@gmail.com>
-        // compare without packing
-        byte[] raw1 = MessagePack.pack(this.get());
-        byte[] raw2 = MessagePack.pack(other.get());
-        return BytesWritable.Comparator.compareBytes(raw1, 0, raw1.length, raw2, 0, raw2.length);
     }
 }

@@ -18,35 +18,24 @@
 
 package org.msgpack.hadoop.hive.serde2;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
-import java.io.IOException;
-import java.io.DataOutputStream;
-import java.io.ByteArrayOutputStream;
-
-import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.serde.Constants;
-import org.apache.hadoop.hive.serde2.SerDe;
+import org.apache.hadoop.hive.serde2.AbstractSerDe;
 import org.apache.hadoop.hive.serde2.SerDeException;
-import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
-import org.apache.hadoop.hive.serde2.lazy.objectinspector.LazySimpleStructObjectInspector;
-import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe.SerDeParameters;
-import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
+import org.apache.hadoop.hive.serde2.SerDeStats;
 import org.apache.hadoop.hive.serde2.lazy.LazyFactory;
-import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
-import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
-import org.apache.hadoop.io.Text;
+import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
+import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe.SerDeParameters;
+import org.apache.hadoop.hive.serde2.lazy.objectinspector.LazySimpleStructObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.io.Writable;
-
-import org.msgpack.hadoop.io.MessagePackWritable;
 import org.msgpack.hadoop.hive.serde2.lazy.LazyMessagePackRow;
+import org.msgpack.hadoop.io.MessagePackWritable;
 
-public class MessagePackSerDe implements SerDe {
+import java.util.Properties;
+
+public class MessagePackSerDe extends AbstractSerDe {
     private static final Log LOG = LogFactory.getLog(MessagePackSerDe.class.getName());
 
     private SerDeParameters serdeParams_;
@@ -79,7 +68,7 @@ public class MessagePackSerDe implements SerDe {
     public Object deserialize(Writable blob) throws SerDeException {
         if (!(blob instanceof MessagePackWritable)) {
             throw new SerDeException(getClass().toString()
-                + ": expects either MessagePackWritable object!");
+                + ": expects MessagePackWritable2 object. Got: " + blob.toString());
         }
         cachedMessagePackRow_.init((MessagePackWritable)blob);
         return cachedMessagePackRow_;
@@ -94,6 +83,11 @@ public class MessagePackSerDe implements SerDe {
     public Writable serialize(Object obj, ObjectInspector objInspector) throws SerDeException {
         LOG.info(obj.toString());
         LOG.info(objInspector.toString());
+        return null;
+    }
+
+    @Override
+    public SerDeStats getSerDeStats() {
         return null;
     }
 }

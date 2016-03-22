@@ -18,42 +18,37 @@
 
 package org.msgpack.hadoop.hive.udf;
 
-import java.util.ArrayList;
-import java.util.Map;
-
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.serde.Constants;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDTF;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.StringObjectInspector;
-import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.io.ArrayWritable;
-import org.apache.hadoop.io.BooleanWritable;
-import org.apache.hadoop.io.FloatWritable;
-import org.apache.hadoop.io.DoubleWritable;
-import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.hive.ql.udf.generic.GenericUDTF;
-import org.apache.commons.codec.binary.Base64;
-import org.msgpack.MessagePackObject;
-import org.msgpack.MessageTypeException;
-import org.msgpack.MessagePack;
-import static org.msgpack.Templates.*;
+import org.msgpack.core.MessagePack;
+import org.msgpack.core.MessageTypeException;
+import org.msgpack.core.MessageUnpacker;
+import org.msgpack.value.ImmutableValue;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+
 
 @Description(name = "msgpack_map",
-    value = "_FUNC_(msgpackBinary, col1, col2, ..., colN) - parse MessagePack raw binary into a map. " +
-    		"All the input parameters and output column types are string.")
+        value = "_FUNC_(msgpackBinary, col1, col2, ..., colN) - parse MessagePack raw binary into a map. " +
+                "All the input parameters and output column types are string.")
 public class GenericUDTFMessagePackMap extends GenericUDTF {
-
     private static Log LOG = LogFactory.getLog(GenericUDTFMessagePackMap.class.getName());
+
+    private static final MessagePack.UnpackerConfig unpackerConfig = new MessagePack.UnpackerConfig();
+    private static final MessagePack.PackerConfig packerConfig = new MessagePack.PackerConfig();
 
     int numCols;    // number of output columns
     String[] keys; // array of path expressions, each of which corresponds to a column
@@ -75,7 +70,7 @@ public class GenericUDTFMessagePackMap extends GenericUDTF {
 
         if (numCols < 1) {
             throw new UDFArgumentException("msgpack_map() takes at least two arguments: " +
-                                           "the MessagePack binary a key");
+                    "the MessagePack binary a key");
         }
 
         if (!(args[0] instanceof StringObjectInspector)) {
@@ -122,8 +117,8 @@ public class GenericUDTFMessagePackMap extends GenericUDTF {
         }
         // get the path expression for the 1st row only
         if (!pathParsed) {
-            for (int i = 0;i < numCols; ++i) {
-                keys[i] = ((StringObjectInspector) inputOIs[i+1]).getPrimitiveJavaObject(o[i+1]);
+            for (int i = 0; i < numCols; ++i) {
+                keys[i] = ((StringObjectInspector) inputOIs[i + 1]).getPrimitiveJavaObject(o[i + 1]);
             }
             pathParsed = true;
         }
@@ -133,34 +128,31 @@ public class GenericUDTFMessagePackMap extends GenericUDTF {
             forward(nullVals);
             return;
         }
+        MessageUnpacker unpacker = unpackerConfig.newUnpacker(binary);
         try {
-            Map<String,MessagePackObject> map = (Map<String,MessagePackObject>)
-                MessagePack.unpack(binary, tMap(TString,TAny));
-            for (int i = 0; i < numCols; ++i) {
-                MessagePackObject obj = map.get(keys[i]);
-                if(obj == null) {
+            Map<String, ImmutableValue> map = new HashMap<String, ImmutableValue>(numCols);
+            int len = unpacker.unpackMapHeader();
+            for (int i = 0; i < len; i++) {
+                // TODO what if not a string?
+                String key = unpacker.unpackString();
+                ImmutableValue value = unpacker.unpackValue();
+                map.put(key, value);
+            }
+            for (int i = 0; i < numCols; i++) {
+                ImmutableValue obj = map.get(keys[i]);
+                if (obj == null) {
                     retVals[i] = null;
                 } else {
-                    retVals[i] = setText(cols[i], obj);
+                    retVals[i] = MessagePackUDTFCommon.setText(packerConfig, cols[i], obj);
                 }
             }
-            //for (int i = 0; i < numCols; ++i) {
-            //  if (jsonObj.isNull(keys[i])) {
-            //    retVals[i] = null;
-            //  } else {
-            //    if (retVals[i] == null) {
-            //      retVals[i] = cols[i]; // use the object pool rather than creating a new object
-            //    }
-            //    retVals[i].set(jsonObj.getString(keys[i]));
-            //  }
-            //}
             forward(retVals);
             return;
 
         } catch (MessageTypeException e) {
             // type error, object is not a map
             if (!seenErrors) {
-                LOG.error("The input is not a map: " + e +  ". Skipping such error messages in the future.");
+                LOG.error("The input is not a map: " + e + ". Skipping such error messages in the future.");
                 seenErrors = true;
             }
             forward(nullVals);
@@ -169,7 +161,7 @@ public class GenericUDTFMessagePackMap extends GenericUDTF {
             // parsing error, invalid MessagePack binary
             if (!seenErrors) {
                 String base64 = new String(Base64.encodeBase64(binary));
-                LOG.error("The input is not a valid MessagePack binary: " + base64 +  ". Skipping such error messages in the future.");
+                LOG.error("The input is not a valid MessagePack binary: " + base64 + ". Skipping such error messages in the future.");
                 seenErrors = true;
             }
             forward(nullVals);
@@ -178,40 +170,6 @@ public class GenericUDTFMessagePackMap extends GenericUDTF {
             LOG.error("MessagePack parsing/evaluation exception" + e);
             forward(nullVals);
             return;
-        }
-    }
-
-    private Text setText(Text to, MessagePackObject obj) {
-        if(obj.isBooleanType()) {
-            if(obj.asBoolean()) {
-                to.set("1");
-            } else {
-                to.set("0");
-            }
-            return to;
-
-        } else if(obj.isIntegerType()) {
-            to.set(Long.toString(obj.asLong()));
-            return to;
-
-        } else if(obj.isFloatType()) {
-            to.set(Double.toString(obj.asDouble()));
-            return to;
-
-        } else if(obj.isArrayType()) {
-            to.set(MessagePack.pack(obj));
-            return to;
-
-        } else if(obj.isMapType()) {
-            to.set(MessagePack.pack(obj));
-            return to;
-
-        } else if(obj.isRawType()) {
-            to.set(obj.asByteArray());
-            return to;
-
-        } else {
-            return null;
         }
     }
 

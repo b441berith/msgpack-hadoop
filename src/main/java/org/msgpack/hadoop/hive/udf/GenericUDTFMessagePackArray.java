@@ -18,44 +18,37 @@
 
 package org.msgpack.hadoop.hive.udf;
 
-import java.util.ArrayList;
-import java.util.List;
-
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.serde.Constants;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDTF;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.StringObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
-import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.io.ArrayWritable;
-import org.apache.hadoop.io.BooleanWritable;
-import org.apache.hadoop.io.FloatWritable;
-import org.apache.hadoop.io.DoubleWritable;
-import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.hive.ql.udf.generic.GenericUDTF;
-import org.apache.commons.codec.binary.Base64;
-import org.msgpack.MessagePackObject;
-import org.msgpack.MessageTypeException;
-import org.msgpack.MessagePack;
-import static org.msgpack.Templates.*;
+import org.msgpack.core.MessagePack;
+import org.msgpack.core.MessageTypeException;
+import org.msgpack.core.MessageUnpacker;
+import org.msgpack.value.ImmutableValue;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Description(name = "msgpack_array",
-    value = "_FUNC_(msgpackBinary, index1, index2, ..., indexN) - parse MessagePack raw binary into a array. " +
-            "All the input parameters and output column types are string.")
+        value = "_FUNC_(msgpackBinary, index1, index2, ..., indexN) - parse MessagePack raw binary into a array. " +
+                "All the input parameters and output column types are string.")
 public class GenericUDTFMessagePackArray extends GenericUDTF {
-
     private static Log LOG = LogFactory.getLog(GenericUDTFMessagePackArray.class.getName());
+
+    private static final MessagePack.UnpackerConfig unpackerConfig = new MessagePack.UnpackerConfig();
+    private static final MessagePack.PackerConfig packerConfig = new MessagePack.PackerConfig();
 
     int numCols;    // number of output columns
     int[] indexes; // array of path expressions, each of which corresponds to a column
@@ -77,7 +70,7 @@ public class GenericUDTFMessagePackArray extends GenericUDTF {
 
         if (numCols < 1) {
             throw new UDFArgumentException("msgpack_array() takes at least two arguments: " +
-                                           "the MessagePack binary a key");
+                    "the MessagePack binary a key");
         }
 
         if (!(args[0] instanceof StringObjectInspector)) {
@@ -124,8 +117,8 @@ public class GenericUDTFMessagePackArray extends GenericUDTF {
         }
         // get the path expression for the 1st row only
         if (!pathParsed) {
-            for (int i = 0;i < numCols; ++i) {
-                indexes[i] = PrimitiveObjectInspectorUtils.getInt(o[i+1], (PrimitiveObjectInspector) inputOIs[i+1]);
+            for (int i = 0; i < numCols; ++i) {
+                indexes[i] = PrimitiveObjectInspectorUtils.getInt(o[i + 1], (PrimitiveObjectInspector) inputOIs[i + 1]);
             }
             pathParsed = true;
         }
@@ -135,38 +128,33 @@ public class GenericUDTFMessagePackArray extends GenericUDTF {
             forward(nullVals);
             return;
         }
+        MessageUnpacker unpacker = unpackerConfig.newUnpacker(binary);
         try {
-            List<MessagePackObject> array = (List<MessagePackObject>)
-                MessagePack.unpack(binary, tList(TAny));
-            for (int i = 0; i < numCols; ++i) {
-                MessagePackObject obj = null;
+            int len = unpacker.unpackArrayHeader();
+            List<ImmutableValue> array = new ArrayList<ImmutableValue>(len);
+            for (int i = 0; i < len; i++) {
+                array.add(unpacker.unpackValue());
+            }
+            for (int i = 0; i < numCols; i++) {
+                ImmutableValue obj = unpacker.unpackValue();
                 int index = indexes[i];
-                if(array.size() > index && index > 0) {
+                if (array.size() > index && index > 0) {
                     obj = array.get(indexes[i]);
                 }
-                if(obj == null) {
+                if (obj == null) {
                     retVals[i] = null;
                 } else {
-                    retVals[i] = setText(cols[i], obj);
+                    retVals[i] = MessagePackUDTFCommon.setText(packerConfig, cols[i], obj);
                 }
             }
-            //for (int i = 0; i < numCols; ++i) {
-            //  if (jsonObj.isNull(indexes[i])) {
-            //    retVals[i] = null;
-            //  } else {
-            //    if (retVals[i] == null) {
-            //      retVals[i] = cols[i]; // use the object pool rather than creating a new object
-            //    }
-            //    retVals[i].set(jsonObj.getString(indexes[i]));
-            //  }
-            //}
+
             forward(retVals);
             return;
 
         } catch (MessageTypeException e) {
             // type error, object is not an array
             if (!seenErrors) {
-                LOG.error("The input is not an array: " + e +  ". Skipping such error messages in the future.");
+                LOG.error("The input is not an array: " + e + ". Skipping such error messages in the future.");
                 seenErrors = true;
             }
             forward(nullVals);
@@ -175,7 +163,7 @@ public class GenericUDTFMessagePackArray extends GenericUDTF {
             // parsing error, invalid MessagePack binary
             if (!seenErrors) {
                 String base64 = new String(Base64.encodeBase64(binary));
-                LOG.error("The input is not a valid MessagePack binary: " + base64 +  ". Skipping such error messages in the future.");
+                LOG.error("The input is not a valid MessagePack binary: " + base64 + ". Skipping such error messages in the future.");
                 seenErrors = true;
             }
             forward(nullVals);
@@ -184,40 +172,6 @@ public class GenericUDTFMessagePackArray extends GenericUDTF {
             LOG.error("MessagePack parsing/evaluation exception" + e);
             forward(nullVals);
             return;
-        }
-    }
-
-    private Text setText(Text to, MessagePackObject obj) {
-        if(obj.isBooleanType()) {
-            if(obj.asBoolean()) {
-                to.set("1");
-            } else {
-                to.set("0");
-            }
-            return to;
-
-        } else if(obj.isIntegerType()) {
-            to.set(Long.toString(obj.asLong()));
-            return to;
-
-        } else if(obj.isFloatType()) {
-            to.set(Double.toString(obj.asDouble()));
-            return to;
-
-        } else if(obj.isArrayType()) {
-            to.set(MessagePack.pack(obj));
-            return to;
-
-        } else if(obj.isMapType()) {
-            to.set(MessagePack.pack(obj));
-            return to;
-
-        } else if(obj.isRawType()) {
-            to.set(obj.asByteArray());
-            return to;
-
-        } else {
-            return null;
         }
     }
 

@@ -21,16 +21,11 @@ package org.msgpack.hadoop.hive.serde2.lazy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Properties;
-import java.io.IOException;
-import java.io.DataOutputStream;
-import java.io.ByteArrayOutputStream;
 
 import org.apache.hadoop.hive.serde2.lazy.ByteArrayRef;
 import org.apache.hadoop.hive.serde2.lazy.LazyFactory;
 import org.apache.hadoop.hive.serde2.lazy.LazyObject;
 import org.apache.hadoop.hive.serde2.lazy.LazyStruct;
-import org.apache.hadoop.hive.serde2.lazy.objectinspector.LazyMapObjectInspector;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.LazySimpleStructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
@@ -68,7 +63,7 @@ public class LazyMessagePackRow extends LazyStruct {
             getFieldInited()[fieldID] = true;
 
             ByteArrayRef ref = new ByteArrayRef();
-            byte[] raw = result_.getRawBytes();
+            byte[] raw = result_.getBytes();
             ref.setData(raw);
             getFields()[fieldID].init(ref, 0, ref.getData().length);
         }

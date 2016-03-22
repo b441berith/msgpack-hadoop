@@ -18,9 +18,6 @@
 
 package org.msgpack.hadoop.mapreduce.output;
 
-import java.io.DataOutputStream;
-import java.io.IOException;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -29,10 +26,9 @@ import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.msgpack.hadoop.io.MessagePackWritable;
+
+import java.io.IOException;
 
 public class MessagePackOutputFormat extends FileOutputFormat<NullWritable, MessagePackWritable> {
     public RecordWriter<NullWritable, MessagePackWritable> getRecordWriter(TaskAttemptContext job) throws IOException, InterruptedException {

@@ -18,31 +18,13 @@
 
 package org.msgpack.hadoop.mapred;
 
-import java.io.IOException;
-
-import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.hive.ql.io.HiveBinaryOutputFormat;
+import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
 import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.NullWritable;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.mapred.InputSplit;
-import org.apache.hadoop.mapred.RecordWriter;
-import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.Reporter;
-import org.apache.hadoop.mapred.FileOutputFormat;
-import org.apache.hadoop.util.Progressable;
-
 import org.msgpack.hadoop.io.MessagePackWritable;
-import org.msgpack.hadoop.mapred.MessagePackRecordWriter;
 
-public class MessagePackOutputFormat extends FileOutputFormat<NullWritable, MessagePackWritable> {
-    @Override
-    public RecordWriter<NullWritable, MessagePackWritable> getRecordWriter(FileSystem ignored,
-        JobConf job, String name, Progressable progress)
-    throws IOException {
-        Path file = FileOutputFormat.getTaskOutputPath(job, name);
-        FileSystem fs = file.getFileSystem(job);
-        FSDataOutputStream fileOut = fs.create(file, progress);
-        return new MessagePackRecordWriter(fileOut);
+public class MessagePackOutputFormat extends HiveBinaryOutputFormat<LongWritable, MessagePackWritable> implements HiveOutputFormat<LongWritable, MessagePackWritable> {
+    public MessagePackOutputFormat() {
+        super();
     }
 }

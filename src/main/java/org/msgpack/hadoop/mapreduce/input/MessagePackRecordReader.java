@@ -18,26 +18,28 @@
 
 package org.msgpack.hadoop.mapreduce.input;
 
-import java.io.IOException;
-import java.io.InputStream;
-
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
-import org.apache.hadoop.io.LongWritable;
-
-import org.msgpack.MessagePack;
-import org.msgpack.Unpacker;
-import org.msgpack.MessagePackObject;
+import org.msgpack.core.MessagePack;
+import org.msgpack.core.MessageUnpacker;
 import org.msgpack.hadoop.io.MessagePackWritable;
+import org.msgpack.value.ImmutableValue;
+
+import java.io.IOException;
 
 public class MessagePackRecordReader extends RecordReader<LongWritable, MessagePackWritable> {
-    private Unpacker unpacker_;
+    private static final Log LOG = LogFactory.getLog(MessagePackRecordReader.class.getName());
+
+    private MessageUnpacker unpacker_;
 
     private final LongWritable key_ = new LongWritable(0);
     private final MessagePackWritable val_;
@@ -45,6 +47,7 @@ public class MessagePackRecordReader extends RecordReader<LongWritable, MessageP
     protected long start_;
     protected long pos_;
     protected long end_;
+
     private FSDataInputStream fileIn_;
 
     public MessagePackRecordReader() {
@@ -62,7 +65,7 @@ public class MessagePackRecordReader extends RecordReader<LongWritable, MessageP
         fileIn_ = fs.open(split.getPath());
 
         // Create streaming unpacker
-        unpacker_ = new Unpacker(fileIn_);
+        unpacker_ = MessagePack.newDefaultUnpacker(fileIn_);
 
         // Seek to the start of the split
         start_ = split.getStart();
@@ -95,11 +98,12 @@ public class MessagePackRecordReader extends RecordReader<LongWritable, MessageP
 
     @Override
     public boolean nextKeyValue() throws IOException, InterruptedException {
-        for (MessagePackObject obj : unpacker_) {
+        if (unpacker_.hasNext()) {
             long key = fileIn_.getPos();
-            MessagePackObject val = obj;
+            ImmutableValue obj = unpacker_.unpackValue();
+            LOG.info(obj.toString());
             key_.set(key);
-            val_.set(val);
+            val_.set(obj);
             return true;
         }
         return false;

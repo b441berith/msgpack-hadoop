@@ -18,26 +18,27 @@
 
 package org.msgpack.hadoop.mapred;
 
-import java.io.IOException;
-import java.io.InputStream;
-
-import org.apache.hadoop.conf.Configuration;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapred.InputSplit;
-import org.apache.hadoop.mapred.RecordReader;
-import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.io.LongWritable;
-
-import org.msgpack.MessagePack;
-import org.msgpack.Unpacker;
-import org.msgpack.MessagePackObject;
+import org.apache.hadoop.mapred.FileSplit;
+import org.apache.hadoop.mapred.InputSplit;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.RecordReader;
+import org.msgpack.core.MessagePack;
+import org.msgpack.core.MessageUnpacker;
 import org.msgpack.hadoop.io.MessagePackWritable;
+import org.msgpack.value.ImmutableValue;
+
+import java.io.IOException;
 
 public class MessagePackRecordReader implements RecordReader<LongWritable, MessagePackWritable> {
-    private Unpacker unpacker_;
+    private static final Log LOG = LogFactory.getLog(MessagePackRecordReader.class.getName());
+
+    private MessageUnpacker unpacker_;
 
     protected long start_;
     protected long pos_;
@@ -53,7 +54,7 @@ public class MessagePackRecordReader implements RecordReader<LongWritable, Messa
         fileIn_ = fs.open(split.getPath());
 
         // Create streaming unpacker
-        unpacker_ = new Unpacker(fileIn_);
+        unpacker_ = MessagePack.newDefaultUnpacker(fileIn_);
 
         // Seek to the start of the split
         start_ = split.getStart();
@@ -86,8 +87,9 @@ public class MessagePackRecordReader implements RecordReader<LongWritable, Messa
 
     public boolean next(LongWritable key, MessagePackWritable val)
     throws IOException  {
-        for (MessagePackObject obj : unpacker_) {
+        if (unpacker_.hasNext()) {
             key.set(fileIn_.getPos());
+            ImmutableValue obj = unpacker_.unpackValue();
             val.set(obj);
             return true;
         }

@@ -18,37 +18,28 @@
 
 package org.msgpack.hadoop.mapred;
 
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapred.InputSplit;
+import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapred.RecordWriter;
-import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Reporter;
-import org.apache.hadoop.io.NullWritable;
-
-import org.msgpack.MessagePack;
-import org.msgpack.Unpacker;
-import org.msgpack.MessagePackObject;
 import org.msgpack.hadoop.io.MessagePackWritable;
 
-public class MessagePackRecordWriter implements RecordWriter<NullWritable, MessagePackWritable> {
+import java.io.DataOutputStream;
+import java.io.IOException;
+
+public class MessagePackRecordWriter implements RecordWriter<LongWritable, MessagePackWritable> {
     protected DataOutputStream out_;
 
     public MessagePackRecordWriter(DataOutputStream out) throws IOException {
         out_ = out;
     }
 
-    public synchronized void write(NullWritable key, MessagePackWritable value) throws IOException {
-        out_.write(value.getRawBytes());
+    @Override
+    public void write(LongWritable longWritable, MessagePackWritable writable) throws IOException {
+        out_.write(writable.getBytes());
     }
 
-    public synchronized void close(Reporter reporter) throws IOException {
+    @Override
+    public void close(Reporter reporter) throws IOException {
         out_.close();
     }
 }
